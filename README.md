@@ -25,7 +25,7 @@ if()|
 ```
 -- before
 if(|)
--- after input <BS> backspace
+-- after input <BS>(backspace)
 if|
 
 -- before
@@ -53,7 +53,7 @@ if()|
 ```
 -- before
 if(|)
--- after input <CR> enter
+-- after input <CR>(enter) which actually mapping to <CR><ESC>O
 if(
 	|
 )

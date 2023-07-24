@@ -6,7 +6,7 @@ local pairs_config = {
     ['['] = ']',
     ['<'] = '>',
     ['\''] = '\'',
-    ['\"'] = '\"',
+    ['"'] = '"',
 }
 
 local function when_input_pair_left(pair_left)
@@ -16,7 +16,6 @@ local function when_input_pair_left(pair_left)
     end
     return pair_left
 end
-
 
 local function when_input_pair_right(pair_right)
     --[[
@@ -51,6 +50,16 @@ local function when_input_pair_right(pair_right)
     return pair_right
 end
 
+local function when_input_pair_ambiguous(pair_ambiguous)
+    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local char_right = vim.api.nvim_buf_get_text(0, row-1, col, row-1, col+1, {})[1]
+    if char_right == pair_ambiguous then
+        return "<Right>"
+    end
+
+    return when_input_pair_left(pair_ambiguous)
+end
+
 local function when_input_enter()
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
     local char_left = vim.api.nvim_buf_get_text(0, row-1, col-1, row-1, col, {})[1]
@@ -82,8 +91,12 @@ function M.setup(opts)
         若 expr 为 flase，则仅仅调用此处的匿名函数
         若 expr 为 true，则是将返回的字符串作为最终的映射 {rhs}
         --]]
-        vim.keymap.set('i', k, function() return when_input_pair_left(k) end, keymap_opts)
-        vim.keymap.set('i', v, function() return when_input_pair_right(v) end, keymap_opts)
+        if k ~= v then
+            vim.keymap.set('i', k, function() return when_input_pair_left(k) end, keymap_opts)
+            vim.keymap.set('i', v, function() return when_input_pair_right(v) end, keymap_opts)
+        else
+            vim.keymap.set('i', k, function() return when_input_pair_ambiguous(k) end, keymap_opts)
+        end
     end
     vim.keymap.set('i', '<CR>', function() return when_input_enter() end, keymap_opts)
     vim.keymap.set('i', '<BS>', function() return when_input_backspace() end, keymap_opts)
