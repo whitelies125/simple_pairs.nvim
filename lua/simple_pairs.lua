@@ -81,7 +81,8 @@ local function when_input_backspace()
 end
 
 function when_input_pair_in_visual(pair_left)
-    if not pairs_config[pair_left] then
+    local pair_right = pairs_config[pair_left]
+    if not pair_right then
         return
     end
     local _, start_row, start_col, _ = unpack(vim.fn.getpos("'<"))
@@ -98,18 +99,31 @@ function when_input_pair_in_visual(pair_left)
         end_col = vim.fn.col("$") - 1
     end
 
-    local str = vim.api.nvim_buf_get_text(0, start_row-1, start_col-1, end_row-1, end_col, {})[1]
-    if str:sub(1,1) == pair_left and str:sub(-1) == pairs_config[pair_left] then
-        vim.api.nvim_buf_set_text(0, end_row-1, end_col-1, end_row-1, end_col, {})
-        vim.api.nvim_buf_set_text(0, start_row-1, start_col-1, start_row-1, start_col, {})
-    else
-        vim.api.nvim_buf_set_text(0, end_row-1, end_col, end_row-1, end_col, {pairs_config[pair_left]})
-        vim.api.nvim_buf_set_text(0, start_row-1, start_col-1, start_row-1, start_col-1, {pair_left})
+    local line = vim.api.nvim_get_current_line()
+    local str = line:sub(start_col, end_col)
+    if str:sub(1,1) == pair_left and str:sub(-1) == pair_right then
+        -- '|' '|' 之间表示选中的字符串选中
+        -- 形如 |"word"|, 选中字符串串内头尾为 pair_left 和 pair_right
+        line = line:sub(1, start_col-1) .. line:sub(start_col+1, end_col-1) .. line:sub(end_col+1)
+        vim.api.nvim_set_current_line(line)
+        return
     end
+
+    local str = line:sub(start_col-1, end_col+1)
+    if str:sub(1,1) == pair_left and str:sub(-1) == pair_right then
+        -- 形如 "|word|", 选中字符串串外头尾为 pair_left 和 pair_right
+        line = line:sub(1, start_col-2) .. line:sub(start_col, end_col) .. line:sub(end_col+2)
+        vim.api.nvim_set_current_line(line)
+        return
+    end
+    -- 形如 |word|
+    line = line:sub(1, start_col-1) .. pair_left .. line:sub(start_col, end_col) .. pair_right .. line:sub(end_col+1)
+    vim.api.nvim_set_current_line(line)
 end
 
 function M.setup(opts)
-    local keymap_opts = { noremap = true, silent = true, expr = true}
+    local keymap_opts = { noremap = true, silent = true }
+    local keymap_expr_opts = { noremap = true, silent = true, expr = true}
     for k,v in pairs(pairs_config) do
         --[[
         expr 为 true，表示映射的是一个表达式，将会使用使用求解该表达的值作为映射结果
@@ -118,19 +132,19 @@ function M.setup(opts)
         若 expr 为 true，则是将返回的字符串作为最终的映射 {rhs}
         --]]
         if k == v then
-            vim.keymap.set('i', k, function() return when_input_pair_ambiguous(k) end, keymap_opts)
+            vim.keymap.set('i', k, function() return when_input_pair_ambiguous(k) end, keymap_expr_opts)
         else
-            vim.keymap.set('i', k, function() return when_input_pair_left(k) end, keymap_opts)
-            vim.keymap.set('i', v, function() return when_input_pair_right(v) end, keymap_opts)
+            vim.keymap.set('i', k, function() return when_input_pair_left(k) end, keymap_expr_opts)
+            vim.keymap.set('i', v, function() return when_input_pair_right(v) end, keymap_expr_opts)
         end
-        if k == "'" or k == '"' then
-            vim.keymap.set('v', k, ":lua when_input_pair_in_visual(\"\\".. k .."\")<CR>", { noremap = true, silent = true })
+        if k == v then
+            vim.keymap.set('v', "<Space>" .. k, ":lua when_input_pair_in_visual(\"\\".. k .."\")<CR>", keymap_opts)
         else
-            vim.keymap.set('v', k, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", { noremap = true, silent = true })
+            vim.keymap.set('v', "<Space>" .. k, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
         end
     end
-    vim.keymap.set('i', '<CR>', function() return when_input_enter() end, keymap_opts)
-    vim.keymap.set('i', '<BS>', function() return when_input_backspace() end, keymap_opts)
+    vim.keymap.set('i', '<CR>', function() return when_input_enter() end, keymap_expr_opts)
+    vim.keymap.set('i', '<BS>', function() return when_input_backspace() end, keymap_expr_opts)
 end
 
 return M
