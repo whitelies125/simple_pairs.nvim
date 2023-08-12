@@ -16,8 +16,8 @@ if()|
 
 -- before
 |
--- after input ([{'"<
-([{'"<|>"'}])
+-- after input ([{'"
+([{'"|"'}])
 ```
 
 ### 删除成对括号
@@ -29,7 +29,7 @@ if(|)
 if|
 
 -- before
-([{'"<|>"'}])
+([{'"|"'}])
 -- after input six <BS>
 |
 ```
@@ -43,9 +43,9 @@ if(|)
 if()|
 
 -- before
-([{'"<|>"'}])
--- after input >"'}])
-([{'"<>"'}])|
+([{'"|"'}])
+-- after input "'}])
+([{'""'}])|
 ```
 
 ### 成对括号内回车缩进
@@ -57,6 +57,28 @@ if(|)
 if(
 	|
 )
+```
+
+### insert 模式下成对括号右移
+
+```
+-- before
+|word
+-- input "
+"|"word"
+-- input <C-E>
+"word|"
+```
+
+### visual 模式下选中本文加括号
+
+```
+-- before
+word
+-- select string "word" and then input <Space>"
+"word"
+-- select string "word" and then input <Space>" again
+word
 ```
 
 # install

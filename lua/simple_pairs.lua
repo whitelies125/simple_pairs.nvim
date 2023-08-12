@@ -80,6 +80,38 @@ local function when_input_backspace()
     end
 end
 
+local function move_pair_right()
+    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    -- ""word word2
+    local line = vim.api.nvim_get_current_line()
+    local char_left = line:sub(col, col)
+    local char_right = line:sub(col+1, col+1)
+    if pairs_config[char_left] ~= char_right then
+        return
+    end
+
+    local word = vim.fn.expand('<cword>')
+    local target_pos = col + word:len()
+    -- "word word2
+    line = line:sub(1, col) .. line:sub(col+2)
+    -- "word" word2
+    line = line:sub(1, target_pos) .. char_right .. line:sub(target_pos + 1)
+    --[[
+    这里，此时直接使用 vim.api.nvim_set_current_line() 或其它修改该行文本的函数 or 操作会报错
+    这里猜测是因为 textlock 所致，因此使用 schedule() 避免 textlock，成功！
+    至于什么情况下会有 textlock，vim 和 neovim 中关于 textlock 的说明都很少，所以暂时没深究
+    --]]
+    vim.schedule(function() vim.api.nvim_set_current_line(line) end)
+    --[[
+    nvim_win_set_cursor({window}, {pos})
+    Sets the (1,0)-indexed cursor position in the window.
+    Parameters:
+    {window} Window handle, or 0 for current window
+    {pos} (row, col) tuple representing the new position
+    --]]
+    vim.api.nvim_win_set_cursor(0, {row, target_pos})
+end
+
 function when_input_pair_in_visual(pair_left)
     local pair_right = pairs_config[pair_left]
     if not pair_right then
@@ -145,6 +177,7 @@ function M.setup(opts)
     end
     vim.keymap.set('i', '<CR>', function() return when_input_enter() end, keymap_expr_opts)
     vim.keymap.set('i', '<BS>', function() return when_input_backspace() end, keymap_expr_opts)
+    vim.keymap.set('i', '<C-E>', function() move_pair_right() end, keymap_opts)
 end
 
 return M
