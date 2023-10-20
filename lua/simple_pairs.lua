@@ -132,6 +132,15 @@ function when_input_pair_in_visual(pair_left)
 
     local line = vim.api.nvim_get_current_line()
     local str = line:sub(start_col, end_col)
+    if #str == 1 then
+        --[[
+        主要为了解决 visual mode 仅选中一个字符，且该字符的 pair_left == pair_right 的场景
+        为了更符合直觉，按形如 |word| 场景处理
+        --]]
+        line = line:sub(1, start_col-1) .. pair_left .. line:sub(start_col, end_col) .. pair_right .. line:sub(end_col+1)
+        vim.api.nvim_set_current_line(line)
+        return
+    end
     if str:sub(1,1) == pair_left and str:sub(-1) == pair_right then
         -- '|' '|' 之间表示选中的字符串选中
         -- 形如 |"word"|, 选中字符串串内头尾为 pair_left 和 pair_right
@@ -172,6 +181,7 @@ function M.setup(opts)
             vim.keymap.set('v', "<Space>" .. k, ":lua when_input_pair_in_visual(\"\\".. k .."\")<CR>", keymap_opts)
         else
             vim.keymap.set('v', "<Space>" .. k, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
+            vim.keymap.set('v', "<Space>" .. v, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
         end
     end
     vim.keymap.set('i', '<CR>', function() return when_input_enter() end, keymap_expr_opts)
