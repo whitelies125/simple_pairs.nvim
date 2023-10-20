@@ -60,6 +60,8 @@ end
 
 local function when_input_enter()
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    -- 防止在行首获取行首之前的字符
+    if col == 0 then return "<CR>" end
     local char_left = vim.api.nvim_buf_get_text(0, row-1, col-1, row-1, col, {})[1]
     local char_right = vim.api.nvim_buf_get_text(0, row-1, col, row-1, col+1, {})[1]
     if pairs_config[char_left] and char_right == pairs_config[char_left] then
@@ -71,6 +73,7 @@ end
 
 local function when_input_backspace()
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    if col == 0 then return "<BS>" end
     local char_left = vim.api.nvim_buf_get_text(0, row-1, col-1, row-1, col, {})[1]
     local char_right = vim.api.nvim_buf_get_text(0, row-1, col, row-1, col+1, {})[1]
     if pairs_config[char_left] and char_right == pairs_config[char_left] then
