@@ -1,13 +1,5 @@
 local M = {}
 
-local pairs_config = {
-    ['{'] = '}',
-    ['('] = ')',
-    ['['] = ']',
-    ['\''] = '\'',
-    ['"'] = '"',
-}
-
 local function when_input_pair_left(pair_left)
     local pair_right = pairs_config[pair_left]
     if pair_right then
@@ -69,7 +61,7 @@ local function when_input_pair_ambiguous(pair_ambiguous)
     return when_input_pair_left(pair_ambiguous)
 end
 
-local function when_input_enter()
+function M.when_input_enter()
     local char_left, char_right = get_char_left_right()
     if char_left == nil then return "<CR>" end
     if char_right == pairs_config[char_left] then
@@ -79,7 +71,7 @@ local function when_input_enter()
     end
 end
 
-local function when_input_backspace()
+function M.when_input_backspace()
     local char_left, char_right = get_char_left_right()
     if char_left == nil then return "<CR>" end
     if char_right == pairs_config[char_left] then
@@ -89,7 +81,7 @@ local function when_input_backspace()
     end
 end
 
-local function move_pair_right()
+function M.move_pair_right()
     local _, char_right = get_char_left_right()
     for _, v in pairs(pairs_config) do
         if v == char_right then
@@ -99,7 +91,7 @@ local function move_pair_right()
     end
 end
 
-local function move_pair_left()
+function M.move_pair_left()
     local row, col = unpack(vim.api.nvim_win_get_cursor(0))
     local line = vim.api.nvim_get_current_line()
     local char_right = line:sub(col+1, col+1)
@@ -139,7 +131,7 @@ function when_input_pair_in_visual(pair_left)
     if #str == 1 then
         --[[
         主要为了解决 visual mode 仅选中一个字符，且该字符的 pair_left == pair_right 的场景
-        为了更符合直觉，按形如 |word| 场景处理
+        为了更符合直觉，该场景按形如 |word| 场景处理，而非删除该字符
         --]]
         line = line:sub(1, start_col-1) .. pair_left .. line:sub(start_col, end_col) .. pair_right .. line:sub(end_col+1)
         goto set_line
@@ -165,12 +157,23 @@ function when_input_pair_in_visual(pair_left)
 end
 
 function M.setup(opts)
+    -- config
+    local default_pairs_config = {
+        ['{'] = '}',
+        ['('] = ')',
+        ['['] = ']',
+        ['\''] = '\'',
+        ['"'] = '"',
+    }
+    pairs_config = opts.pairs_config or default_pairs_config
+    local visual_model_trigger_key = opts.visual_model_trigger_key
+    -- keymap
     local keymap_opts = { noremap = true, silent = true }
     local keymap_expr_opts = { noremap = true, silent = true, expr = true}
     for k,v in pairs(pairs_config) do
         --[[
         expr 为 true，表示映射的是一个表达式，将会使用使用求解该表达的值作为映射结果
-        例如，此处 auto_complete_pairs(k) 函数的返回值为一个字符串
+        例如，此处 when_input_pair_ambiguous(k) 函数的返回值为一个字符串
         若 expr 为 flase，则仅仅调用此处的匿名函数
         若 expr 为 true，则是将返回的字符串作为最终的映射 {rhs}
         --]]
@@ -180,17 +183,20 @@ function M.setup(opts)
             vim.keymap.set('i', k, function() return when_input_pair_left(k) end, keymap_expr_opts)
             vim.keymap.set('i', v, function() return when_input_pair_right(v) end, keymap_expr_opts)
         end
-        if k == v then
-            vim.keymap.set('v', "<Space>" .. k, ":lua when_input_pair_in_visual(\"\\".. k .."\")<CR>", keymap_opts)
-        else
-            vim.keymap.set('v', "<Space>" .. k, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
-            vim.keymap.set('v', "<Space>" .. v, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
+
+        if visual_model_trigger_key then
+            if k == v then
+                if k == '"' or k == '\'' then
+                    vim.keymap.set('v', visual_model_trigger_key .. k, ":lua when_input_pair_in_visual(\"\\".. k .."\")<CR>", keymap_opts)
+                else
+                    vim.keymap.set('v', visual_model_trigger_key .. k, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
+                end
+            else
+                vim.keymap.set('v', visual_model_trigger_key .. k, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
+                vim.keymap.set('v', visual_model_trigger_key .. v, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
+            end
         end
     end
-    vim.keymap.set('i', '<CR>', function() return when_input_enter() end, keymap_expr_opts)
-    vim.keymap.set('i', '<BS>', function() return when_input_backspace() end, keymap_expr_opts)
-    vim.keymap.set('i', '<C-E>', function() move_pair_right() end, keymap_opts)
-    vim.keymap.set('i', '<C-Y>', function() move_pair_left() end, keymap_opts)
 end
 
 return M

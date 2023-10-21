@@ -94,8 +94,30 @@ lazy.nvim :
 ```
 {
     "whitelies125/simple_pairs.nvim",
+    -- pairs config
+    opts = {
+        pairs_config = {
+            ['{'] = '}',
+            ['('] = ')',
+            ['['] = ']',
+            ['\''] = '\'',
+            ['"'] = '"',
+        },
+        -- 用于 visual_model 下对选中字符串添加 pair 的 {lhs} 的前缀按键
+        -- 若不设置，或设为 nil，false 则表示不使用该功能
+        visual_model_trigger_key = "<Space>"
+    },
     config = function(_, opts)
-        require("simple_pairs").setup()
+        local sp = require("simple_pairs")
+        sp.setup(opts)
+
+        -- keymap
+        local keymap_opts = { noremap = true, silent = true }
+        local keymap_expr_opts = { noremap = true, silent = true, expr = true}
+        vim.keymap.set('i', '<CR>', function() return sp.when_input_enter() end, keymap_expr_opts)
+        vim.keymap.set('i', '<BS>', function() return sp.when_input_backspace() end, keymap_expr_opts)
+        vim.keymap.set('i', '<C-E>', sp.move_pair_right, keymap_opts)
+        vim.keymap.set('i', '<C-Y>', sp.move_pair_left, keymap_opts)
     end,
 }
 ```
