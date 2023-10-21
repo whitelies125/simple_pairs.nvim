@@ -73,7 +73,7 @@ end
 
 function M.when_input_backspace()
     local char_left, char_right = get_char_left_right()
-    if char_left == nil then return "<CR>" end
+    if char_left == nil then return "<BS>" end
     if char_right == pairs_config[char_left] then
         return "<BS><Del>"
     else
