@@ -2,11 +2,15 @@
 
 用于自动补全成对括号、删除成对括号、跳出右括号、成对括号内回车缩进的 neovim 插件。
 
+a simple autopairs plugin for neovim
+
 # usage
 
-### 补全成对括号
-
 `|` 表示光标
+
+`|` means cursor
+
+### 补全成对括号 complete pair_right
 
 ```
 -- before
@@ -20,7 +24,7 @@ if()|
 ([{'"|"'}])
 ```
 
-### 删除成对括号
+### 删除成对括号 delete pair_right
 
 ```
 -- before
@@ -30,11 +34,11 @@ if|
 
 -- before
 ([{'"|"'}])
--- after input six <BS>
+-- after input <BS> 6 times
 |
 ```
 
-### 跳出右括号
+### 跳出右括号 jump out pair_right
 
 ```
 -- before
@@ -48,7 +52,7 @@ if()|
 ([{'""'}])|
 ```
 
-### 成对括号内回车缩进
+### 成对括号内回车缩进 insert new line after input <CR> in pair
 
 ```
 -- before
@@ -59,7 +63,7 @@ if(
 )
 ```
 
-### insert 模式下成对括号右移
+### insert 模式下成对括号移动 fast move pair_right in insert mode
 
 ```
 -- before
@@ -68,22 +72,24 @@ if(
 "|"word"
 -- input <C-E>
 "word|"
+-- input <C-Y>
+"wor|"d
 ```
 
-### visual 模式下选中本文加括号
+### visual 模式下选中本文加括号 bracket or unbracket selected string in visual mode
 
 ```
 -- before
 word
 -- select string "word" and then input <Space>"
 "word"
--- select string "word" and then input <Space>" again
+-- select string "word" or word, and then input <Space>" again
 word
 ```
 
 # install
 
-使用 lazy.nvim :
+lazy.nvim :
 
 ```
 {

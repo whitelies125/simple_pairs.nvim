@@ -16,7 +16,9 @@ local function when_input_pair_left(pair_left)
     return pair_left
 end
 
-local function when_input_pair_right(pair_right)
+-- char_right: normal mode 当前光标所在的字符, insert mode 中当前光标右侧的首个字符
+-- char_left: normal mode 当前光标所在字符的左侧首个字符, insert mode 中当前光标左侧的首个字符
+local function get_char_left_right()
     --[[
     nvim_win_get_cursor()
     获得当前光标位置
@@ -42,6 +44,16 @@ local function when_input_pair_right(pair_right)
         所以对该 api 来说，即认为第一行的行号为 0
     --]]
     local char_right = vim.api.nvim_buf_get_text(0, row-1, col, row-1, col+1, {})[1]
+    if col == 0 then
+        -- 防止在行首获取行首之前的字符
+        return nil, char_right
+    end
+    local char_left = vim.api.nvim_buf_get_text(0, row-1, col-1, row-1, col, {})[1]
+    return char_left, char_right
+end
+
+local function when_input_pair_right(pair_right)
+    local _, char_right = get_char_left_right()
     if char_right == pair_right then
         return "<Right>"
     end
@@ -49,22 +61,18 @@ local function when_input_pair_right(pair_right)
 end
 
 local function when_input_pair_ambiguous(pair_ambiguous)
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    local char_right = vim.api.nvim_buf_get_text(0, row-1, col, row-1, col+1, {})[1]
-    if char_right == pair_ambiguous then
-        return "<Right>"
-    end
+    -- 先尝试作为 pair_right 处理
+    local ret = when_input_pair_right(pair_ambiguous)
+    if ret == "<Right>" then return ret end
 
+    -- 再作为 pair_left 处理
     return when_input_pair_left(pair_ambiguous)
 end
 
 local function when_input_enter()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    -- 防止在行首获取行首之前的字符
-    if col == 0 then return "<CR>" end
-    local char_left = vim.api.nvim_buf_get_text(0, row-1, col-1, row-1, col, {})[1]
-    local char_right = vim.api.nvim_buf_get_text(0, row-1, col, row-1, col+1, {})[1]
-    if pairs_config[char_left] and char_right == pairs_config[char_left] then
+    local char_left, char_right = get_char_left_right()
+    if char_left == nil then return "<CR>" end
+    if char_right == pairs_config[char_left] then
         return "<CR><ESC>O"
     else
         return "<CR>"
@@ -72,11 +80,9 @@ local function when_input_enter()
 end
 
 local function when_input_backspace()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    if col == 0 then return "<BS>" end
-    local char_left = vim.api.nvim_buf_get_text(0, row-1, col-1, row-1, col, {})[1]
-    local char_right = vim.api.nvim_buf_get_text(0, row-1, col, row-1, col+1, {})[1]
-    if pairs_config[char_left] and char_right == pairs_config[char_left] then
+    local char_left, char_right = get_char_left_right()
+    if char_left == nil then return "<CR>" end
+    if char_right == pairs_config[char_left] then
         return "<BS><Del>"
     else
         return "<BS>"
@@ -84,9 +90,7 @@ local function when_input_backspace()
 end
 
 local function move_pair_right()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-    local line = vim.api.nvim_get_current_line()
-    local char_right = line:sub(col+1, col+1)
+    local _, char_right = get_char_left_right()
     for _, v in pairs(pairs_config) do
         if v == char_right then
             vim.cmd("normal xep")
@@ -138,26 +142,25 @@ function when_input_pair_in_visual(pair_left)
         为了更符合直觉，按形如 |word| 场景处理
         --]]
         line = line:sub(1, start_col-1) .. pair_left .. line:sub(start_col, end_col) .. pair_right .. line:sub(end_col+1)
-        vim.api.nvim_set_current_line(line)
-        return
+        goto set_line
     end
     if str:sub(1,1) == pair_left and str:sub(-1) == pair_right then
         -- '|' '|' 之间表示选中的字符串选中
         -- 形如 |"word"|, 选中字符串串内头尾为 pair_left 和 pair_right
         line = line:sub(1, start_col-1) .. line:sub(start_col+1, end_col-1) .. line:sub(end_col+1)
-        vim.api.nvim_set_current_line(line)
-        return
+        goto set_line
     end
 
-    local str = line:sub(start_col-1, end_col+1)
+    str = line:sub(start_col-1, end_col+1)
     if str:sub(1,1) == pair_left and str:sub(-1) == pair_right then
         -- 形如 "|word|", 选中字符串串外头尾为 pair_left 和 pair_right
         line = line:sub(1, start_col-2) .. line:sub(start_col, end_col) .. line:sub(end_col+2)
-        vim.api.nvim_set_current_line(line)
-        return
+        goto set_line
     end
     -- 形如 |word|
     line = line:sub(1, start_col-1) .. pair_left .. line:sub(start_col, end_col) .. pair_right .. line:sub(end_col+1)
+
+    ::set_line::
     vim.api.nvim_set_current_line(line)
 end
 
