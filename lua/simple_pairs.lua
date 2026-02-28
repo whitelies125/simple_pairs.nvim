@@ -1,4 +1,8 @@
 local M = {}
+-- 兼容不同 Lua 版本：Lua 5.1 使用全局 `unpack`，Lua 5.2+ 使用 `table.unpack`
+local unpack = table.unpack or unpack
+local pairs_config = {}
+local right_pairs_set = {}
 
 local function when_input_pair_left(pair_left)
     local pair_right = pairs_config[pair_left]
@@ -83,49 +87,64 @@ end
 
 function M.move_pair_right()
     local _, char_right = get_char_left_right()
-    for _, v in pairs(pairs_config) do
-        if v == char_right then
-            vim.cmd("normal xep")
-            return
-        end
+    if right_pairs_set[char_right] then
+        vim.cmd("normal! xep")
+        return
     end
 end
 
 function M.move_pair_left()
-    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local _, col = unpack(vim.api.nvim_win_get_cursor(0))
     local line = vim.api.nvim_get_current_line()
     local char_right = line:sub(col+1, col+1)
-    for _, v in pairs(pairs_config) do
-        if v == char_right then
-            if col == #line - 1 then
-                vim.cmd("normal xhp")
-            else
-                vim.cmd("normal xhhp")
-            end
-            return
+    if right_pairs_set[char_right] then
+        if col == #line - 1 then
+            vim.cmd("normal! xhp")
+        else
+            vim.cmd("normal! xhhp")
         end
+        return
     end
 end
 
-function when_input_pair_in_visual(pair_left)
+local function get_current_visual_range()
+    local _, v_row, v_col = unpack(vim.fn.getpos("v"))
+    local cur_row, cur_col = unpack(vim.api.nvim_win_get_cursor(0))
+    -- nvim_win_get_cursor 的列是 0-based，这里转成 1-based 以便和 getpos("v") 的列坐标一致。
+    cur_col = cur_col + 1
+
+    local start_row, start_col, end_row, end_col
+    if (v_row < cur_row) or (v_row == cur_row and v_col <= cur_col) then
+        start_row, start_col = v_row, v_col
+        end_row, end_col = cur_row, cur_col
+    else
+        start_row, start_col = cur_row, cur_col
+        end_row, end_col = v_row, v_col
+    end
+    return start_row, start_col, end_row, end_col
+end
+
+local function exit_visual_mode()
+    vim.api.nvim_input("<Esc>")
+end
+
+local function when_input_pair_in_visual(pair_left)
     local pair_right = pairs_config[pair_left]
     if not pair_right then
         return
     end
-    local _, start_row, start_col, _ = unpack(vim.fn.getpos("'<"))
-    local _, end_row, end_col, _ = unpack(vim.fn.getpos("'>"))
-    if start_row ~= end_row then
-        print("simple_paris.nvim : not support multiple lines.")
+    local visual_mode = vim.fn.visualmode()
+    if visual_mode ~= "v" then
+        vim.notify("simple_pairs.nvim: only characterwise visual mode is supported.", vim.log.levels.WARN)
+        exit_visual_mode()
         return
     end
-    if end_col == vim.v.maxcol then
-        --[[
-        col("$")
-        返回光标行的行尾 (返回光标行的字节数加 1)
-        --]]
-        end_col = vim.fn.col("$") - 1
+    local start_row, start_col, end_row, end_col = get_current_visual_range()
+    if start_row ~= end_row then
+        vim.notify("simple_pairs.nvim: not support multiple lines.", vim.log.levels.WARN)
+        exit_visual_mode()
+        return
     end
-
     local line = vim.api.nvim_get_current_line()
     local str = line:sub(start_col, end_col)
     if #str == 1 then
@@ -154,9 +173,11 @@ function when_input_pair_in_visual(pair_left)
 
     ::set_line::
     vim.api.nvim_set_current_line(line)
+    exit_visual_mode()
 end
 
 function M.setup(opts)
+    opts = opts or {}
     -- config
     local default_pairs_config = {
         ['{'] = '}',
@@ -166,6 +187,10 @@ function M.setup(opts)
         ['"'] = '"',
     }
     pairs_config = opts.pairs_config or default_pairs_config
+    right_pairs_set = {}
+    for _, v in pairs(pairs_config) do
+        right_pairs_set[v] = true
+    end
     local visual_model_trigger_key = opts.visual_model_trigger_key
     -- keymap
     local keymap_opts = { noremap = true, silent = true }
@@ -186,14 +211,10 @@ function M.setup(opts)
 
         if visual_model_trigger_key then
             if k == v then
-                if k == '"' or k == '\'' then
-                    vim.keymap.set('v', visual_model_trigger_key .. k, ":lua when_input_pair_in_visual(\"\\".. k .."\")<CR>", keymap_opts)
-                else
-                    vim.keymap.set('v', visual_model_trigger_key .. k, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
-                end
+                vim.keymap.set('v', visual_model_trigger_key .. k, function() when_input_pair_in_visual(k) end, keymap_opts)
             else
-                vim.keymap.set('v', visual_model_trigger_key .. k, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
-                vim.keymap.set('v', visual_model_trigger_key .. v, ":lua when_input_pair_in_visual(\"".. k .."\")<CR>", keymap_opts)
+                vim.keymap.set('v', visual_model_trigger_key .. k, function() when_input_pair_in_visual(k) end, keymap_opts)
+                vim.keymap.set('v', visual_model_trigger_key .. v, function() when_input_pair_in_visual(k) end, keymap_opts)
             end
         end
     end
